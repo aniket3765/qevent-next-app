@@ -1,10 +1,10 @@
 'use client';
 
 import EventCard from "@/components/EventCard";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from 'next/navigation';
 
-export default function EventsPage() {
+function EventsContent() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -12,7 +12,6 @@ export default function EventsPage() {
   const searchParams = useSearchParams();
   const artistQuery = searchParams.get('artist');
   const tagQuery = searchParams.get('tag');
-
 
   useEffect(() => {
     const fetchEvents = async () => {
@@ -23,60 +22,64 @@ export default function EventsPage() {
         }
         const data = await response.json();
 
-        // Filter events by artist name from query
-        // const filteredEvents = artistQuery
-        //   ? data.filter((e) =>(e.artist && e.artist.toLowerCase() === artistQuery.toLowerCase()))
-        //   : data;
-        const filteredEvents = artistQuery
-  ? data.filter((e) =>(e.artist && e.artist.toLowerCase() === artistQuery.toLowerCase()))
-  : data;
-
+        const filteredEvents = data.filter((event) => {
+          const artistMatch = artistQuery
+            ? event.artist?.toLowerCase() === artistQuery.toLowerCase()
+            : true;
+          const tagMatch = tagQuery
+            ? event.tags?.includes(tagQuery)
+            : true;
+          return artistMatch && tagMatch;
+        });
 
         setEvents(filteredEvents);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'An unknown error occurred');
+        setError(err instanceof Error ? err.message : "An unknown error occurred");
       } finally {
         setLoading(false);
       }
     };
 
     fetchEvents();
-  }, [artistQuery]);
+  }, [artistQuery, tagQuery]);
 
   if (loading) {
-    return (
-      <main className="min-h-screen p-24">
-        <h1 className="text-4xl font-bold mb-8">Events</h1>
-        <p>Loading events...</p>
-      </main>
-    );
+    return <p>Loading events...</p>;
   }
 
   if (error) {
-    return (
-      <main className="min-h-screen p-24">
-        <h1 className="text-4xl font-bold mb-8">Events</h1>
-        <p className="text-red-500">Error: {error}</p>
-      </main>
-    );
+    return <p className="text-red-500">Error: {error}</p>;
   }
 
   return (
-    <main className="min-h-screen p-24">
-     <h1 className="text-4xl font-bold mb-8">
-  {artistQuery ? `Events by ${artistQuery}` : tagQuery ? `Events with tag "${tagQuery}"` : 'Events'}
-</h1>
+    <>
+      <h1 className="text-4xl font-bold mb-8">
+        {artistQuery
+          ? `Events by ${artistQuery}`
+          : tagQuery
+          ? `Events with tag "${tagQuery}"`
+          : "Events"}
+      </h1>
 
-      
       {events.length === 0 ? (
-        <p>No events found for this artist.</p>
+        <p>No events found.</p>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {events.map((event) => (
-            <EventCard key={event?.id} eventData={event} />
+            <EventCard key={event.id} eventData={event} />
           ))}
         </div>
       )}
+    </>
+  );
+}
+
+export default function EventsPage() {
+  return (
+    <main className="min-h-screen p-24">
+      <Suspense fallback={<p>Loading filters...</p>}>
+        <EventsContent />
+      </Suspense>
     </main>
   );
 }
